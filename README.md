@@ -34,6 +34,54 @@ Documentation, au format [Diátaxis](https://diataxis.fr/) :
 
 ---
 
+## Filiation : le mode de fonctionnement de Jev
+
+Ce dépôt tire son nom et son mode de fonctionnement d'un modèle réel :
+**Jev**, développé par TypeSafe AI et publié en 2026. D'après sa
+[page Wikipédia](https://en.wikipedia.org/wiki/Jev_(AI_model)) et la
+documentation éditeur, Jev n'est pas un LLM : il ne génère pas de texte.
+Une requête Jev est un bloc d'*état* (chaîne, objet JSON ou tableau) plus
+une ou plusieurs *questions typées* ; le modèle renvoie des valeurs
+typées accompagnées de probabilités et d'un score de confiance, destinées
+à être consommées par du logiciel. Les questions appartiennent à un jeu
+de primitives défini à l'avance (`Choice`, `Score`, `Noul`), ce qui
+interdit toute réponse hors schéma et, selon TypeSafe, l'hallucination.
+Jev est décrit comme fondé sur un transformer, entraîné sur des données
+synthétiques.
+
+Le mini-transformer de ce dépôt reproduit ce **mode d'emploi** à l'échelle
+d'un jouet :
+
+| Aspect | Jev (TypeSafe AI) | Ce dépôt |
+|---|---|---|
+| Entrée | bloc d'état + questions typées | une requête d'accès sérialisée en six tokens `champ=valeur` |
+| Question | primitive `Choice` / `Score` / `Noul` | un choix fermé binaire `{ALLOW, DENY}` (cas le plus simple de `Choice`) |
+| Sortie | valeur typée + probabilités + confiance | classe choisie + `[P(DENY), P(ALLOW)]`, confiance affichée par `ask` |
+| Génération de texte | non | non |
+| Hors schéma | impossible | impossible : deux classes seulement |
+| Fondation | transformer | transformer (self-attention, voir §2 du tutoriel) |
+| Données | synthétiques | synthétiques : énumérées par `policy.All()`, étiquetées par l'oracle Rego |
+
+Les différences, à garder en tête :
+
+- **Échelle et moyens.** Jev est un modèle de production propriétaire ;
+  ici, `DModel = 16` et une seule tête d'attention, entraînés sur 1128
+  exemples.
+- **Méthode d'entraînement.** TypeSafe indique entraîner Jev par RLCD
+  (*Reinforcement Learning for Calibrated Decisions*), en optimisant les
+  probabilités contre des résultats. Ce dépôt fait de l'apprentissage
+  supervisé classique : entropie croisée et descente de gradient (SGD).
+- **Architecture exacte.** Celle de Jev n'est pas publique (ni poids, ni
+  article technique) ; la parenté décrite ici porte sur le mode
+  d'entrée/sortie, pas sur une réimplémentation.
+
+Ce projet est indépendant et **sans aucune affiliation avec TypeSafe AI**.
+Le nom « Jev » est ici un clin d'œil pédagogique à ce mode de
+fonctionnement : un modèle qui rend une décision typée et sa probabilité,
+plutôt que du texte.
+
+---
+
 ## Le cas d'usage
 
 `policy/policy.rego` définit qui a le droit de faire quoi sur des

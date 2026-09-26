@@ -7,6 +7,12 @@ n'est pas la performance, mais de rendre visible, ligne par ligne, ce qui
 se passe dans un transformer minimal — de l'embedding jusqu'à la
 rétropropagation.
 
+Le nom « Jev » renvoie au modèle de TypeSafe AI, qui ne génère pas de
+texte mais renvoie des valeurs typées avec leurs probabilités et une
+confiance. Ce dépôt en reprend le mode d'entrée/sortie à l'échelle d'un
+jouet (voir la section « Filiation » du [`README.md`](README.md)) ; il
+n'en est ni une réimplémentation, ni un produit affilié.
+
 Le dépôt se lit dans cet ordre :
 
 ```
