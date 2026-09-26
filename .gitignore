@@ -10,7 +10,7 @@ jevgo
 /vendor/
 
 # Poids générés par l'entraînement (regénérables via `go run ./training`)
-weights/router.json
+weights/*.json
 
 # Environnements et éditeurs
 .env

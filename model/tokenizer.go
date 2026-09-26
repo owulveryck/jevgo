@@ -1,6 +1,10 @@
-// Package model implémente un mini-transformer « from scratch » pour la
-// classification de snippets de code (Go vs TypeScript), entraîné par
-// rétropropagation manuelle — sans framework de machine learning.
+// Package model implémente un mini-transformer « from scratch » — embeddings,
+// self-attention, rétropropagation manuelle, SGD — sans framework de machine
+// learning. Le domaine d'exemple du dépôt est le contrôle d'accès aux
+// documents (package policy), dont les requêtes sont déjà fournies sous forme
+// de tokens par Request.Tokens ; Tokenize ci-dessous reste une utilité
+// générique pour découper du texte (code ou langage naturel) si vous adaptez
+// le modèle à un autre jeu de données.
 package model
 
 import (
@@ -14,12 +18,12 @@ var multiCharOps = []string{
 	":=", "=>", "==", "!=", "<=", ">=", "&&", "||", "++", "--", "->", "...",
 }
 
-// Tokenize découpe un extrait de code en une séquence de tokens textuels.
-// Les identifiants et mots-clés sont conservés tels quels (la casse compte :
-// "func" et "function" doivent rester deux tokens différents). Les
-// littéraux de chaînes et les nombres sont normalisés en tokens génériques
-// pour ne pas polluer le vocabulaire avec du contenu non pertinent pour
-// détecter le langage.
+// Tokenize découpe un extrait de code (ou de texte) en une séquence de
+// tokens textuels. Les identifiants et mots-clés sont conservés tels quels
+// (la casse compte : "func" et "function" doivent rester deux tokens
+// différents). Les littéraux de chaînes et les nombres sont normalisés en
+// tokens génériques pour ne pas polluer le vocabulaire avec du contenu non
+// porteur de signal pour la tâche de classification.
 func Tokenize(src string) []string {
 	var tokens []string
 	runes := []rune(src)

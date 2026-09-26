@@ -5,124 +5,64 @@ import (
 	"log"
 
 	"github.com/owulveryck/jevgo/model"
+	"github.com/owulveryck/jevgo/policy"
 )
 
 const (
-	lr          = 0.1
-	epochs      = 300
-	weightsPath = "weights/router.json"
+	lr              = 0.02
+	epochs          = 400
+	attnWeightsPath = "weights/policy-attention.json"
+	baseWeightsPath = "weights/policy-baseline.json"
 )
 
-type sample struct {
-	code  string
-	label int
-}
-
-// Dataset volontairement varié : le motif à apprendre n'est plus la simple
-// présence d'un caractère, mais un vrai signal syntaxique (mots-clés,
-// opérateurs, structure) qui distingue effectivement Go de TypeScript.
-var dataset = []sample{
-	{`package main
 func main() {
-	fmt.Println("hello")
-}`, model.LabelGo},
-	{`func Add(a int, b int) int {
-	return a + b
-}`, model.LabelGo},
-	{`type Point struct {
-	X int
-	Y int
-}`, model.LabelGo},
-	{`for i := 0; i < 10; i++ {
-	fmt.Println(i)
-}`, model.LabelGo},
-	{`if err != nil {
-	return nil, err
-}`, model.LabelGo},
-	{`go func() {
-	ch <- compute()
-}()`, model.LabelGo},
-	{`defer file.Close()`, model.LabelGo},
-	{`var wg sync.WaitGroup
-wg.Add(1)`, model.LabelGo},
-	{`type Reader interface {
-	Read(p []byte) (n int, err error)
-}`, model.LabelGo},
-	{`m := map[string]int{"a": 1}`, model.LabelGo},
-	{`package model
+	// 1. Dataset : l'intégralité de l'espace des requêtes, moins les 24
+	// requêtes-faille mises de côté. L'étiquette de chaque requête est
+	// fournie par policy.Request.Decide(), la traduction fidèle de
+	// policy.rego : Rego est l'oracle qui fabrique le dataset supervisé.
+	train, loophole := policy.Split()
+	fmt.Printf("Exemples d'entraînement : %d — mis de côté (faille) : %d\n", len(train), len(loophole))
 
-import "fmt"
-
-const weightsPath = "weights/router.json"`, model.LabelGo},
-	{`switch x := v.(type) {
-case int:
-	fmt.Println(x)
-}`, model.LabelGo},
-
-	{`function add(a: number, b: number): number {
-	return a + b;
-}`, model.LabelTypeScript},
-	{`const greet = (name: string): void => {
-	console.log("hello " + name);
-};`, model.LabelTypeScript},
-	{`interface Point {
-	x: number;
-	y: number;
-}`, model.LabelTypeScript},
-	{`for (let i = 0; i < 10; i++) {
-	console.log(i);
-}`, model.LabelTypeScript},
-	{`export class Service {
-	constructor(private readonly repo: Repo) {}
-}`, model.LabelTypeScript},
-	{`async function fetchData(): Promise<void> {
-	await fetch("/api");
-}`, model.LabelTypeScript},
-	{`import { useState } from "react";
-const [count, setCount] = useState(0);`, model.LabelTypeScript},
-	{`type Result<T> = { ok: true; value: T } | { ok: false; error: string };`, model.LabelTypeScript},
-	{`export default function App() {
-	return null;
-}`, model.LabelTypeScript},
-	{`const m: Map<string, number> = new Map();`, model.LabelTypeScript},
-	{`try {
-	doSomething();
-} catch (e) {
-	console.error(e);
-}`, model.LabelTypeScript},
-	{`enum Status {
-	Active,
-	Inactive,
-}`, model.LabelTypeScript},
-}
-
-func main() {
-	// 1. Tokenisation de tout le corpus, pour construire le vocabulaire.
-	tokenized := make([][]string, len(dataset))
-	for i, s := range dataset {
-		tokenized[i] = model.Tokenize(s.code)
+	tokenized := make([][]string, len(train))
+	labels := make([]int, len(train))
+	for i, req := range train {
+		tokenized[i] = req.Tokens()
+		if req.Decide() {
+			labels[i] = model.LabelAllow
+		} else {
+			labels[i] = model.LabelDeny
+		}
 	}
+
+	// 2. Vocabulaire reconstruit à partir du corpus de requêtes.
 	vocab := model.NewVocab(tokenized)
 	fmt.Printf("Vocabulaire : %d tokens\n", vocab.Size())
 
-	// 2. Entraînement du transformer minimal, exemple par exemple (pas de
-	// batch ni de padding : on garde la simplicité pédagogique des scripts
-	// d'origine, tout en rétropropageant réellement le gradient).
-	m := model.New(vocab, 1337)
+	// 3. Deux modèles entraînés sur le MÊME dataset : le transformer du
+	// package model (embeddings + self-attention) et un sac d'embeddings
+	// sans attention, pour comparer ce que l'attention apporte.
+	attn := model.New(vocab, 1337)
+	baseline := policy.NewBagOfEmbeddings(vocab, model.DModel, 1337)
 
 	for epoch := 1; epoch <= epochs; epoch++ {
-		totalLoss := 0.0
-		for i, s := range dataset {
+		attnLoss, baseLoss := 0.0, 0.0
+		for i := range train {
 			ids := vocab.Encode(tokenized[i])
-			totalLoss += m.TrainStep(ids, s.label, lr)
+			attnLoss += attn.TrainStep(ids, labels[i], lr)
+			baseLoss += baseline.TrainStep(ids, labels[i], lr)
 		}
-		if epoch == 1 || epoch%50 == 0 {
-			fmt.Printf("Époque %3d — perte moyenne : %.4f\n", epoch, totalLoss/float64(len(dataset)))
+		if epoch == 1 || epoch%5 == 0 {
+			fmt.Printf("Époque %2d — perte attention : %.4f — perte sans attention : %.4f\n",
+				epoch, attnLoss/float64(len(train)), baseLoss/float64(len(train)))
 		}
 	}
 
-	if err := m.Save(weightsPath); err != nil {
-		log.Fatalf("sauvegarde des poids : %v", err)
+	if err := attn.Save(attnWeightsPath); err != nil {
+		log.Fatalf("sauvegarde (attention) : %v", err)
 	}
-	fmt.Printf("\nPoids et vocabulaire sauvegardés dans %s\n", weightsPath)
+	if err := baseline.Save(baseWeightsPath); err != nil {
+		log.Fatalf("sauvegarde (baseline) : %v", err)
+	}
+	fmt.Printf("\nPoids sauvegardés dans %s et %s\n", attnWeightsPath, baseWeightsPath)
+	fmt.Println("Interrogez-les avec : go run ./ask -demo")
 }

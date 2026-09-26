@@ -10,13 +10,13 @@ import (
 
 const (
 	DModel     = 16 // Dimension latente de chaque token
-	NumClasses = 2  // 0 = Go, 1 = TypeScript
+	NumClasses = 2  // 0 = deny, 1 = allow
 )
 
 // Étiquettes du dataset — à utiliser plutôt que des 0/1 en dur.
 const (
-	LabelGo         = 0
-	LabelTypeScript = 1
+	LabelDeny  = 0
+	LabelAllow = 1
 )
 
 // Model est un mini-transformer à une seule tête d'attention :
