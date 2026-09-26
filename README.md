@@ -101,14 +101,15 @@ demandeur, MFA)` — et le modèle apprend une fonction
 
 ### Le rôle de Rego : oracle à l'entraînement, référence à l'inférence
 
-Rego n'est jamais appelé *par* le modèle, ni à l'entraînement ni à
-l'inférence : c'est le modèle qui apprend à l'imiter. Mais Rego est bien
-**exécuté**, par le vrai moteur OPA, comme oracle :
+Le modèle n'appelle jamais Rego, ni à l'entraînement ni à l'inférence :
+c'est le modèle qui apprend à l'imiter. Mais Rego est bien **exécuté**,
+par le vrai moteur OPA, comme oracle — par le programme d'entraînement
+d'un côté, par le CLI de l'autre :
 
 - **À l'entraînement**, le moteur OPA (SDK Go `opa/rego`) évalue
   `policy.rego` (`data.access.allow`) sur chacune des 1128 requêtes
-  d'entraînement générées par énumération (`policy.All()`, moins les 24
-  mises de côté). Sa réponse étiquette le dataset supervisé. La politique
+  d'entraînement (`policy.Split()`). Sa réponse étiquette le dataset
+  supervisé, régénéré à chaque `go run ./training`. La politique
   n'est pas dupliquée en Go : `policy.rego` est l'unique source de vérité,
   embarquée dans le binaire (`go:embed`).
 - **À l'inférence**, le CLI confronte la prédiction des modèles à la

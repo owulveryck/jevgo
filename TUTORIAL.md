@@ -113,10 +113,10 @@ n'annote à la main : c'est l'oracle qui fabrique le dataset supervisé
 (voir §4). La politique n'est pas recopiée en Go, elle est embarquée dans
 le binaire avec `go:embed` et reste l'unique source de vérité.
 
-**Deux modèles, un même dataset.** `training/main.go` entraîne en
-parallèle le transformer (`model.New`) et un sac d'embeddings sans
-attention (`policy.NewBagOfEmbeddings`), afin de comparer ce que
-l'attention apporte. Le sac de mots moyenne les embeddings des six tokens
+**Deux modèles, un même dataset.** `training/main.go` entraîne côte à côte,
+dans la même boucle et sur le même exemple, le transformer (`model.New`) et
+un sac d'embeddings sans attention (`policy.NewBagOfEmbeddings`), afin de
+comparer ce que l'attention apporte. Le sac de mots moyenne les embeddings des six tokens
 puis applique une couche linéaire : aucun mélange entre positions.
 
 **Pourquoi exemple par exemple, sans batch ?** Le jeu de données est ici
@@ -149,8 +149,10 @@ modèle deviendrait incohérent.
 
 ## 4. Le cas d'usage « politique d'accès » : quelle question, quel rôle pour Rego
 
-Cette section répond à une confusion fréquente : on ne classe pas des
-employés, et Rego n'est pas appelé par le modèle.
+Cette section répond à deux confusions fréquentes : on ne classe pas des
+employés, et le modèle n'appelle pas Rego. Il faut distinguer soigneusement
+**qui exécute Rego** : à l'entraînement c'est le programme d'entraînement,
+à l'inférence c'est le CLI, mais jamais le modèle lui-même.
 
 ### Quelle est la question posée ?
 
@@ -169,14 +171,18 @@ personnes, mais l'imitation d'une fonction de décision.
 En apprentissage supervisé, il faut des paires (entrée, étiquette).
 Personne n'a annoté 1128 requêtes à la main : c'est le moteur de règles qui
 joue ce rôle. Le programme charge `policy.rego` dans le moteur OPA
-(`policy.NewEvaluator`), puis, pour chaque requête générée par
-`policy.All()`, lui demande « ALLOW ou DENY ? » ; cette réponse devient
+(`policy.NewEvaluator`), puis, pour chaque requête d'entraînement
+(`policy.Split()`), lui demande « ALLOW ou DENY ? » ; cette réponse devient
 l'étiquette d'entraînement utilisée par `TrainStep`.
 
-Rego n'est donc **jamais appelé par le modèle**, ni pendant
-l'entraînement ni pendant l'inférence : c'est le modèle qui apprend à
-l'imiter. Le moteur OPA, lui, a servi en amont à fabriquer le dataset
-étiqueté. C'est la même relation qu'entre un correcteur qui note des
+Précisons donc qui appelle qui, car c'est une confusion fréquente :
+**Rego est bien exécuté pendant l'entraînement**, mais par le programme
+`training/main.go`, requête par requête (`training/main.go:39`), pour
+fabriquer les étiquettes. Les étiquettes ne sont ni pré-calculées ni
+stockées sur disque : elles sont régénérées à chaque `go run ./training`.
+**Le modèle, lui, n'appelle jamais Rego** — ni pendant l'entraînement, ni
+pendant l'inférence : il apprend à l'imiter à partir des étiquettes, puis
+s'en passe. C'est la même relation qu'entre un correcteur qui note des
 copies et un élève qui essaie ensuite de deviner la note sans le
 correcteur — sauf qu'ici le correcteur est déterministe et peut noter
 l'intégralité des copies possibles (1152 combinaisons), pas juste un

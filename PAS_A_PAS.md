@@ -14,9 +14,9 @@ pour les paramètres exacts, [`REFERENCE.md`](REFERENCE.md).
 
 On veut un modèle qui répond **ALLOW** (autoriser) ou **DENY** (refuser) à
 une demande d'accès — exactement comme la politique Rego. On va lui montrer
-des milliers de demandes déjà tranchées par Rego, puis lui apprendre à
-deviner la réponse tout seul. Ensuite, on lui pose des demandes que Rego
-n'a **jamais** vues à l'entraînement, et on regarde s'il a bien « compris »
+plus d'un millier de demandes déjà tranchées par Rego, puis lui apprendre à
+deviner la réponse tout seul. Ensuite, on lui pose des demandes que **le
+modèle** n'a **jamais** vues à l'entraînement, et on regarde s'il a bien « compris »
 ou s'il se contente de réciter.
 
 ---
@@ -73,26 +73,7 @@ modèle verra ainsi tous les cas « ordinaires » au moins une fois.
 
 ---
 
-## Étape 3 — Demander la réponse à Rego : voilà le dataset
-
-Pour chacune des 1152 demandes, le programme appelle le **moteur OPA** sur
-`policy.rego` (`dataset.access.allow`). La réponse devient l'étiquette.
-
-| rôle | action | classif. | dép. doc | dép. dem. | MFA | Rego | étiquette |
-|---|---|---|---|---|---|---|---|
-| `admin` | `delete` | `confidential` | `hr` | `engineering` | non | ALLOW (règle 1) | 1 |
-| `employee` | `read` | `internal` | `hr` | `hr` | non | ALLOW (règle 2) | 1 |
-| `employee` | `read` | `internal` | `hr` | `finance` | non | DENY | 0 |
-| `guest` | `read` | `public` | `hr` | `engineering` | non | ALLOW (règle 4) | 1 |
-| `contractor` | `read` | `internal` | `hr` | `hr` | non | ALLOW (règle 5) | 1 |
-
-> « Rego sert de professeur, mais le modèle ne l'appelle jamais. » Rego a
-> fabriqué les étiquettes **une fois, en amont** ; le modèle apprend
-> ensuite tout seul, et n'a plus besoin de Rego pour fonctionner.
-
----
-
-## Étape 4 — Mettre de côté 24 cas, pour tester la compréhension
+## Étape 3 — Mettre de côté 24 cas, pour tester la compréhension
 
 Parmi les 1152 demandes, 24 sont particulières : `contractor` + `read` +
 `internal` avec un département **différent** du sien. C'est la faille de la
@@ -107,6 +88,29 @@ règle 5.
 
 C'est le cœur de la démo : Rego dit ALLOW sur ces 24 cas (sa règle est
 trop permissive), mais **aucun de ces cas n'a été montré au modèle**.
+
+---
+
+## Étape 4 — Demander la réponse à Rego : voilà le dataset
+
+Pour chacune des **1128 demandes d'entraînement**, le programme appelle le
+**moteur OPA** sur `policy.rego` (`data.access.allow`). La réponse devient
+l'étiquette. Les 24 demandes-faille, mises de côté à l'étape 3, ne sont
+donc jamais étiquetées ici : le CLI les réévaluera à la demande, plus tard,
+via le même moteur OPA.
+
+| rôle | action | classif. | dép. doc | dép. dem. | MFA | Rego | étiquette |
+|---|---|---|---|---|---|---|---|
+| `admin` | `delete` | `confidential` | `hr` | `engineering` | non | ALLOW (règle 1) | 1 |
+| `employee` | `read` | `internal` | `hr` | `hr` | non | ALLOW (règle 2) | 1 |
+| `employee` | `read` | `internal` | `hr` | `finance` | non | DENY | 0 |
+| `guest` | `read` | `public` | `hr` | `engineering` | non | ALLOW (règle 4) | 1 |
+| `contractor` | `read` | `internal` | `hr` | `hr` | non | ALLOW (règle 5) | 1 |
+
+> « Rego sert de professeur, mais le modèle ne l'appelle jamais. » À chaque
+> exécution de l'entraînement, le moteur OPA étiquette les 1128 demandes
+> d'entraînement ; une fois entraîné, le modèle n'a plus besoin de Rego
+> pour fonctionner.
 
 ---
 
