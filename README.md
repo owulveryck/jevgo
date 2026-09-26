@@ -25,6 +25,9 @@ weights/     les poids sérialisés (JSON), produit de l'entraînement
 
 Documentation, au format [Diátaxis](https://diataxis.fr/) :
 
+- [`PAS_A_PAS.md`](PAS_A_PAS.md) — **explication pas à pas** : comment le
+  dataset est fabriqué depuis `policy.rego` et comment le modèle apprend,
+  sans prérequis.
 - [`TUTORIAL.md`](TUTORIAL.md) — **tutoriel** : embedding, entraînement,
   inférence, rôle de Rego, howto pour changer ou ajouter un classificateur.
 - [`REFERENCE.md`](REFERENCE.md) — **référence** : paramètres (`lr`,
@@ -99,16 +102,19 @@ demandeur, MFA)` — et le modèle apprend une fonction
 ### Le rôle de Rego : oracle à l'entraînement, référence à l'inférence
 
 Rego n'est jamais appelé *par* le modèle, ni à l'entraînement ni à
-l'inférence. Il intervient en amont :
+l'inférence : c'est le modèle qui apprend à l'imiter. Mais Rego est bien
+**exécuté**, par le vrai moteur OPA, comme oracle :
 
-- **À l'entraînement**, `Request.Decide()` (la traduction fidèle en Go de
-  `policy.rego`) étiquette chacune des 1128 requêtes d'entraînement
-  générées par énumération (`policy.All()`, moins les 24 mises de côté).
-  C'est l'oracle qui fabrique le dataset supervisé.
+- **À l'entraînement**, le moteur OPA (SDK Go `opa/rego`) évalue
+  `policy.rego` (`data.access.allow`) sur chacune des 1128 requêtes
+  d'entraînement générées par énumération (`policy.All()`, moins les 24
+  mises de côté). Sa réponse étiquette le dataset supervisé. La politique
+  n'est pas dupliquée en Go : `policy.rego` est l'unique source de vérité,
+  embarquée dans le binaire (`go:embed`).
 - **À l'inférence**, le CLI confronte la prédiction des modèles à la
-  réponse littérale de `Decide()`, et met en évidence les cas où un
-  modèle statistique **généralise** là où Rego exécute mécaniquement sa
-  règle.
+  réponse du moteur OPA sur la même politique, et met en évidence les cas
+  où un modèle statistique **généralise** là où Rego exécute mécaniquement
+  sa règle.
 
 Étant donné un dataset supervisé, deux modèles sont entraînés côte à côte :
 

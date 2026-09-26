@@ -1,5 +1,5 @@
 // Commande ask : pose une requête d'accès au modèle entraîné et confronte sa
-// prédiction à la réponse littérale de Rego (policy.Request.Decide).
+// prédiction à la réponse littérale de Rego (évaluée par le moteur OPA).
 //
 // C'est le banc de test visuel du dépôt : là où Rego exécute mécaniquement
 // ses règles et ne peut ni douter ni signaler sa propre faille, le modèle
@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -36,6 +37,12 @@ func main() {
 	)
 	flag.Parse()
 
+	ctx := context.Background()
+	eval, err := policy.NewEvaluator(ctx)
+	if err != nil {
+		log.Fatalf("chargement de la politique : %v", err)
+	}
+
 	attn, err := model.Load(attnWeightsPath)
 	if err != nil {
 		log.Fatalf("impossible de charger le modèle avec attention : %v\n(lancez d'abord 'go run ./training')", err)
@@ -46,7 +53,7 @@ func main() {
 	}
 
 	if *demo {
-		runDemo(attn, baseline)
+		runDemo(ctx, attn, baseline, eval)
 		return
 	}
 
@@ -67,7 +74,7 @@ func main() {
 		RequesterDepartment:    *reqDept,
 		MFA:                    *mfa,
 	}
-	printDetail(evaluate(attn, baseline, req))
+	printDetail(evaluate(ctx, attn, baseline, eval, req))
 }
 
 type result struct {
@@ -81,10 +88,13 @@ type result struct {
 	divergence bool
 }
 
-func evaluate(attn *model.Model, baseline *policy.BagOfEmbeddings, req policy.Request) result {
+func evaluate(ctx context.Context, attn *model.Model, baseline *policy.BagOfEmbeddings, eval *policy.Evaluator, req policy.Request) result {
 	attnClass, attnProbs := attn.Forward(attn.Vocab.Encode(req.Tokens()))
 	baseClass, baseProbs := baseline.Forward(baseline.Vocab.Encode(req.Tokens()))
-	rego := req.Decide()
+	rego, err := eval.Eval(ctx, req)
+	if err != nil {
+		log.Fatalf("évaluation OPA : %v", err)
+	}
 	return result{
 		req:        req,
 		rego:       rego,
@@ -115,7 +125,7 @@ func printDetail(r result) {
 
 // --- Mode démo (tableau) --------------------------------------------------
 
-func runDemo(attn *model.Model, baseline *policy.BagOfEmbeddings) {
+func runDemo(ctx context.Context, attn *model.Model, baseline *policy.BagOfEmbeddings, eval *policy.Evaluator) {
 	presets := []policy.Request{
 		{Role: "employee", Action: "read", ResourceClassification: "public",
 			ResourceDepartment: "engineering", RequesterDepartment: "engineering", MFA: false},
@@ -137,7 +147,7 @@ func runDemo(attn *model.Model, baseline *policy.BagOfEmbeddings) {
 	fmt.Fprintln(w, "REQUETE\tREGO\tJEV (attention)\tSAC DE MOTS\tNOTE")
 	divergences, unknownSeen := 0, 0
 	for _, req := range presets {
-		res := evaluate(attn, baseline, req)
+		res := evaluate(ctx, attn, baseline, eval, req)
 		if res.divergence {
 			divergences++
 		}

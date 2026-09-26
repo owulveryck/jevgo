@@ -31,7 +31,7 @@ func All() []Request {
 // Split sépare le dataset complet en un ensemble d'entraînement et un
 // ensemble « faille » mis de côté : les requêtes où un contractor lit un
 // document interne d'un AUTRE département que le sien (24 cas sur 1152).
-// Elles sont autorisées par Decide() (règle 5), mais volontairement
+// Elles sont autorisées par policy.rego (règle 5), mais volontairement
 // absentes de l'entraînement, pour observer ce que le modèle prédit sur ce
 // cas précis une fois entraîné sans jamais l'avoir vu.
 func Split() (train []Request, loophole []Request) {

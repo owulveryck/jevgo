@@ -204,7 +204,7 @@ Résultat
 
 | Champ | Signification |
 |---|---|
-| `Rego (règle littérale)` | `policy.Request.Decide()` : exécution mécanique de `policy.rego`. Aucune probabilité. |
+| `Rego (règle littérale)` | Décision du moteur OPA (`policy.Evaluator.Eval`) sur `policy.rego`. Aucune probabilité. |
 | `Jev (avec attention)` | `model.Forward` : classe prédite et confiance associée. |
 | `Sac de mots (sans attention)` | `BagOfEmbeddings.Forward`, même présentation. |
 | `confiance` | Probabilité de la classe prédite, en pourcentage (`probs[classe] × 100`). |
@@ -250,10 +250,20 @@ sont retirées de l'entraînement.
 
 ### 6.2 Décision de l'oracle
 
-`Request.Decide()` renvoie un `bool` reproduisant exactement `policy.rego`
-(règles 1 à 5, défaut DENY). Les règles s'appuient sur `Role`, `Action`,
-`RequesterDepartment` vs `ResourceDepartment`, `MFA` et
-`ResourceClassification`.
+La politique est exécutée par le moteur OPA (SDK Go
+`github.com/open-policy-agent/opa/rego`), via `policy.Evaluator` :
+
+| Élément | Détail |
+|---|---|
+| Fichier politique | `policy/policy.rego`, embarqué dans le binaire (`go:embed`). |
+| Syntaxe | Rego **v1** (`allow if { … }`, `default allow := false`). Le SDK est configuré avec `rego.SetRegoVersion(ast.RegoV1)`. |
+| Requête | `data.access.allow`. |
+| Compilation | `policy.NewEvaluator(ctx)` appelle `PrepareForEval` une fois. |
+| Évaluation | `Evaluator.Eval(ctx, req)` construit l'input JSON puis appelle `Eval` ; renvoie un `bool` (règles 1 à 5, défaut DENY). |
+| Champs d'entrée | `role`, `action`, `resource_classification`, `resource_department`, `requester_department`, `mfa`. |
+
+Aucune logique de politique n'est dupliquée en Go : `policy.rego` est
+l'unique source de vérité.
 
 ### 6.3 Fichiers de poids (JSON)
 
@@ -291,3 +301,16 @@ régénérés par `go run ./training` et ignorés par Git
 | `1` | `training`, `ask` | Échec de sauvegarde/chargement des poids (`log.Fatalf`). |
 | `2` | `ask` | Champs de requête manquants (hors `-demo`). |
 | `2` | `ask` | Drapeau invalide (par ex. `-mfa` sans valeur booléenne), géré par `flag`. |
+| `1` | `training`, `ask` | Échec de compilation ou d'évaluation de `policy.rego` par OPA (`log.Fatalf`). |
+
+---
+
+## 8. Dépendances
+
+| Dépendance | Rôle | Portée |
+|---|---|---|
+| `github.com/open-policy-agent/opa` | Moteur Rego : compilation et évaluation de `policy.rego` comme oracle. | `policy` (import `opa/rego`, `opa/ast`), utilisée par `training` et `ask`. |
+
+Le reste du dépôt (`model`, `policy` hors OPA, `training`, `ask`) n'utilise
+que la bibliothèque standard. Le module est déclaré dans `go.mod` et figé
+par `go.sum`.

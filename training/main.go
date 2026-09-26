@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -16,10 +17,18 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
+
+	// 0. L'oracle : le moteur OPA exécute policy.rego. C'est lui qui fournit
+	// les étiquettes du dataset, sans logique dupliquée côté Go.
+	eval, err := policy.NewEvaluator(ctx)
+	if err != nil {
+		log.Fatalf("chargement de la politique : %v", err)
+	}
+
 	// 1. Dataset : l'intégralité de l'espace des requêtes, moins les 24
-	// requêtes-faille mises de côté. L'étiquette de chaque requête est
-	// fournie par policy.Request.Decide(), la traduction fidèle de
-	// policy.rego : Rego est l'oracle qui fabrique le dataset supervisé.
+	// requêtes-faille mises de côté. L'étiquette de chaque requête est la
+	// réponse de policy.rego (data.access.allow).
 	train, loophole := policy.Split()
 	fmt.Printf("Exemples d'entraînement : %d — mis de côté (faille) : %d\n", len(train), len(loophole))
 
@@ -27,7 +36,11 @@ func main() {
 	labels := make([]int, len(train))
 	for i, req := range train {
 		tokenized[i] = req.Tokens()
-		if req.Decide() {
+		allow, err := eval.Eval(ctx, req)
+		if err != nil {
+			log.Fatalf("évaluation de la requête %+v : %v", req, err)
+		}
+		if allow {
 			labels[i] = model.LabelAllow
 		} else {
 			labels[i] = model.LabelDeny

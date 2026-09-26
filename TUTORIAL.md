@@ -17,10 +17,13 @@ Le dépôt se lit dans cet ordre :
 
 ```
 model/       le transformer (model.go) + le vocabulaire (tokenizer.go)
-policy/      le domaine : Request, l'oracle Decide, le sac de mots baseline
+policy/      le domaine : Request, l'évaluateur OPA, le sac de mots baseline
 training/    l'entraînement des deux modèles
 ask/         le CLI d'inférence et de comparaison à Rego
 ```
+
+Pour une explication pas à pas, sans prérequis, de la fabrication du
+dataset et de l'apprentissage, voir [`PAS_A_PAS.md`](PAS_A_PAS.md).
 
 ---
 
@@ -104,9 +107,11 @@ régulièrement : c'est le signe que le modèle apprend effectivement à
 séparer ALLOW de DENY plutôt que de mémoriser au hasard.
 
 **Les étiquettes viennent de Rego.** Pour chaque requête, l'étiquette est
-`req.Decide()` — la traduction fidèle de `policy.rego` en Go. Personne
+la réponse de `policy.rego` (`data.access.allow`), **évaluée par le vrai
+moteur OPA** via le SDK Go `opa/rego` (`policy/rego.go`). Personne
 n'annote à la main : c'est l'oracle qui fabrique le dataset supervisé
-(voir §4).
+(voir §4). La politique n'est pas recopiée en Go, elle est embarquée dans
+le binaire avec `go:embed` et reste l'unique source de vérité.
 
 **Deux modèles, un même dataset.** `training/main.go` entraîne en
 parallèle le transformer (`model.New`) et un sac d'embeddings sans
@@ -162,25 +167,30 @@ personnes, mais l'imitation d'une fonction de décision.
 ### Le rôle de Rego pendant l'entraînement : l'oracle qui étiquette
 
 En apprentissage supervisé, il faut des paires (entrée, étiquette).
-Personne n'a annoté 1128 requêtes à la main : c'est le moteur de règles —
-`policy.rego`, reproduit par `Request.Decide()` en Go — qui joue ce rôle.
-Pour chaque requête générée par `policy.All()`, on lui demande
-« ALLOW ou DENY ? », et cette réponse devient l'étiquette d'entraînement
-utilisée par `TrainStep`.
+Personne n'a annoté 1128 requêtes à la main : c'est le moteur de règles qui
+joue ce rôle. Le programme charge `policy.rego` dans le moteur OPA
+(`policy.NewEvaluator`), puis, pour chaque requête générée par
+`policy.All()`, lui demande « ALLOW ou DENY ? » ; cette réponse devient
+l'étiquette d'entraînement utilisée par `TrainStep`.
 
 Rego n'est donc **jamais appelé par le modèle**, ni pendant
-l'entraînement ni pendant l'inférence : il a servi une seule fois, en
-amont, à fabriquer le dataset étiqueté. C'est la même relation qu'entre
-un correcteur qui note des copies et un élève qui essaie ensuite de
-deviner la note sans le correcteur — sauf qu'ici le correcteur est
-déterministe et peut noter l'intégralité des copies possibles (1152
-combinaisons), pas juste un échantillon.
+l'entraînement ni pendant l'inférence : c'est le modèle qui apprend à
+l'imiter. Le moteur OPA, lui, a servi en amont à fabriquer le dataset
+étiqueté. C'est la même relation qu'entre un correcteur qui note des
+copies et un élève qui essaie ensuite de deviner la note sans le
+correcteur — sauf qu'ici le correcteur est déterministe et peut noter
+l'intégralité des copies possibles (1152 combinaisons), pas juste un
+échantillon.
+
+Concrètement, `policy/policy.rego` est en syntaxe Rego v1 (`allow if { … }`)
+et `policy/rego.go` la compile une fois pour toutes
+(`PrepareForEval`) avant de l'évaluer sur chaque requête.
 
 ### Le rôle de Rego à l'inférence : la référence à laquelle on compare
 
 Les 24 requêtes-faille (`policy.Split`, deuxième valeur de retour) n'ont
 jamais été montrées au modèle à l'entraînement. Pour savoir ce qu'aurait
-dû répondre le modèle, le CLI redemande à Rego (`Decide()`) — sur ce
+dû répondre le modèle, le CLI redemande au moteur OPA — sur ce
 sous-ensemble précis, la réponse est toujours ALLOW, par construction
 (elles ont été sélectionnées justement parce qu'elles déclenchent la
 règle 5).
@@ -277,15 +287,15 @@ ou le domaine. Il suffit de modifier le package `policy` :
 
 1. Ajuster les listes de valeurs dans `policy/request.go` (`Roles`,
    `Actions`, `Classifications`, `Departments`).
-2. Mettre à jour `Request.Decide()` **et** `policy/policy.rego` en
-   parallèle (les deux doivent rester synchronisés).
+2. Mettre à jour `policy/policy.rego` (syntaxe v1). C'est l'unique source
+   de vérité de la politique : les étiquettes en découlent directement.
 3. Ajuster si besoin `IsLoophole()` et `Request.Tokens()`.
 4. Relancer `go run ./training`, qui reconstruira le vocabulaire et
    réentraînera depuis zéro.
 
 Rien d'autre à changer : `policy.All()` génère le dataset par énumération
-des listes, et le vocabulaire est reconstruit automatiquement à partir du
-nouveau corpus.
+des listes, le moteur OPA réévalue `policy.rego`, et le vocabulaire est
+reconstruit automatiquement à partir du nouveau corpus.
 
 ### Ajouter une troisième classe (ou plus)
 
@@ -295,8 +305,9 @@ Pour passer par exemple à trois issues (ALLOW / DENY / REVIEW) :
    ajouter une constante d'étiquette (`LabelReview = 2`) à côté de
    `LabelDeny` / `LabelAllow`.
 2. Dans `training/main.go`, produire l'étiquette correspondante pour
-   chaque requête (l'oracle `Decide()` devient une fonction
-   `→ {deny, allow, review}` plutôt qu'un booléen).
+   chaque requête (la politique `policy.rego` doit alors renvoyer une
+   valeur à trois états — un score ou un ensemble d'options — plutôt
+   qu'un booléen).
 3. Aucune autre modification n'est nécessaire dans `model.go` : `WClass`,
    la boucle de calcul des logits, le softmax et la boucle de
    rétropropagation de la tête de classification

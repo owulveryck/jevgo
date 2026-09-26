@@ -1,7 +1,6 @@
 // Package policy fournit le domaine d'exemple « contrôle d'accès aux
-// documents » : une structure de requête, l'évaluateur qui reproduit très
-// exactement policy.rego, et la sérialisation en tokens consommables par
-// jevgo/model.
+// documents » : une structure de requête, l'évaluateur OPA qui exécute
+// policy.rego, et la sérialisation en tokens consommables par jevgo/model.
 package policy
 
 import "strconv"
@@ -26,35 +25,10 @@ type Request struct {
 	MFA                    bool
 }
 
-// Decide reproduit exactement les règles "allow" de policy.rego. C'est
-// l'oracle qui fournit les étiquettes du dataset — dans un système réel,
-// on appellerait ici le vrai moteur OPA (CLI `opa eval` ou le SDK Go
-// github.com/open-policy-agent/opa/rego) plutôt que de dupliquer la
-// logique à la main ; on la duplique ici pour que l'exemple tourne sans
-// dépendance ni réseau. Gardez les deux fichiers synchronisés si vous
-// modifiez l'un des deux.
-func (r Request) Decide() bool {
-	if r.Role == "admin" {
-		return true // règle 1
-	}
-	if r.Role == "employee" && r.Action == "read" && r.RequesterDepartment == r.ResourceDepartment {
-		return true // règle 2
-	}
-	if r.Role == "employee" && r.Action == "write" && r.RequesterDepartment == r.ResourceDepartment && r.MFA {
-		return true // règle 3
-	}
-	if r.Action == "read" && r.ResourceClassification == "public" {
-		return true // règle 4
-	}
-	if r.Role == "contractor" && r.Action == "read" && r.ResourceClassification == "internal" {
-		return true // règle 5 — la faille
-	}
-	return false
-}
-
 // IsLoophole signale les requêtes qui n'empruntent QUE la règle 5, avec un
 // département demandeur différent du département de la ressource — le cas
-// qu'un relecteur humain jugerait suspect, même si Decide() répond "allow".
+// qu'un relecteur humain jugerait suspect, même si policy.rego répond
+// "allow".
 func (r Request) IsLoophole() bool {
 	return r.Role == "contractor" &&
 		r.Action == "read" &&
