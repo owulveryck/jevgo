@@ -25,7 +25,7 @@ weights/     les poids sérialisés (JSON), produit de l'entraînement
 
 ## Le POC en une image
 
-![Le modèle n'exécute pas la règle : il interpole à partir d'exemples](docs/one-slide-complex.png)
+![Le modèle n'exécute pas la règle : il interpole à partir d'exemples](docs/one-slide-complex.svg)
 
 1. **Rego fournit 1 152 exemples** : toutes les requêtes possibles,
    étiquetées par la politique ; en rouge, les 24 requêtes de la faille
