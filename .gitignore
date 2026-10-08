@@ -18,3 +18,7 @@ weights/*.json
 .vscode/
 *.swp
 .DS_Store
+
+# Sorties générées par mdslides (regénérables)
+slides/*.html
+slides/*/

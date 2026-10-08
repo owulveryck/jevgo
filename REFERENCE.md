@@ -67,9 +67,12 @@ uniquement à tirer les poids de départ (`randMatrix`, loi uniforme dans
   d'itération ⇒ mêmes poids finaux. L'ordre d'itération est déterministe
   (celui de `policy.Split`).
 - **Effet** : une graine différente change le point de départ, donc la
-  solution atteinte. La généralisation sur les 24 cas-faille varie ainsi
-  de 0 à 19 cas selon la graine, à hyperparamètres par ailleurs identiques.
-  `1337` a été choisie parce qu'elle produit une démonstration nette.
+  solution atteinte. Mesuré sur les graines 1 à 40, à hyperparamètres
+  identiques : de 0 à 21 cas-faille refusés sur 24, médiane 9 ; `1337` en
+  donne 11. La graine 6 refuse 24/24 mais rate la règle 5 (2/8), et 7
+  graines sur 40 n'atteignent pas 100 % d'exactitude sur l'entraînement.
+  Avec `1337`, les P(DENY) sur les 24 cas-faille sont tranchées : 10 au-dessus
+  de 95 %, 11 sous 2 %.
 
 ### 1.4 Ordre d'entraînement
 

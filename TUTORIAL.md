@@ -243,8 +243,10 @@ Ce que chaque ligne raconte :
   et 3 exigent la correspondance de département, et généralise : DENY.
   **C'est la réponse que Rego ne sait pas donner** : une politique
   écrite en règles ne peut pas signaler que sa propre règle 5 est un cas
-  limite suspect. Le modèle statistique, lui, « doute » et rend ce doute
-  visible sous forme de probabilité.
+  limite suspect. Le modèle statistique, lui, peut être en désaccord.
+  Prudence toutefois : il ne refuse que 11 des 24 cas-faille, avec des
+  probabilités tranchées dans les deux sens, et la même requête avec MFA
+  passe en ALLOW (voir `README.md`, « Ce que la mesure dit vraiment »).
 - **Ligne 5** — un rôle inconnu (`intern`) : Rego retombe sur son cas par
   défaut (`default allow = false`), le modèle encode le token en UNK et
   continue de raisonner sur les autres champs. Les deux ont leurs
@@ -277,6 +279,11 @@ Analyse
   correspondance de département : il généralise et répond DENY. C'est
   exactement ce que Rego ne sait pas faire — douter de sa propre règle.
 ```
+
+Ce texte d'analyse est celui qu'imprime le CLI. Il force le trait : le
+désaccord sur cette requête est réel, mais il ne s'étend qu'à 11 des 24
+cas-faille, et la confiance affichée n'est pas un doute calibré (voir
+`README.md`, « Ce que la mesure dit vraiment »).
 
 Le CLI affiche aussi un avertissement lorsqu'un champ est hors vocabulaire
 (il ne peut pas savoir s'il s'agit d'une valeur métier légitime ou d'une

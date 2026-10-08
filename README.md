@@ -166,7 +166,7 @@ Résultat
 | `employee read public engineering/engineering` | ALLOW | cas ordinaire, tout le monde s'accorde |
 | `guest delete confidential finance/marketing` | DENY | cas ordinaire, tout le monde s'accorde |
 | `contractor read internal hr/hr` | ALLOW | règle 5 **apprise** (cas présent à l'entraînement) |
-| `contractor read internal hr/marketing` | ALLOW | **faille tenue à l'écart** : le transformer généralise et prédit DENY |
+| `contractor read internal hr/marketing` | ALLOW | **faille tenue à l'écart** : le transformer prédit DENY (95,2 %) ; voir plus bas, 11 cas-faille sur 24 seulement |
 | `intern read confidential hr/engineering` | DENY | rôle inconnu : token UNK côté modèle |
 
 La ligne 4 est le cœur de la démonstration : les 24 requêtes-faille
@@ -177,6 +177,27 @@ restés dans le dataset, et a vu par ailleurs que les règles 2 et 3
 exigent la correspondance de département : il généralise et répond DENY.
 C'est une réponse que Rego, purement mécanique, **ne peut pas fournir** :
 il ne sait pas signaler que sa propre règle 5 est suspecte.
+
+Ce que la mesure dit vraiment (seed 1337, poids de `go run ./training`) :
+
+- Sur les **24** requêtes-faille, le transformer en refuse **11** et suit Rego
+  (ALLOW) sur les 13 autres. Il garde la règle 5 sur les 8 cas légitimes
+  (même département).
+- Ses réponses sont **tranchées dans les deux sens** : 10 cas au-dessus de
+  95 % de DENY, 11 sous 2 %. Le 95,2 % de la ligne 4 vaut pour cette seule
+  requête, pas pour le coin entier.
+- La même requête avec `-mfa` donne **ALLOW** (P(DENY) = 1,3 %), alors
+  qu'aucune règle de lecture n'utilise le MFA : la « correspondance de
+  département » apprise est fragile.
+- Le résultat dépend de la graine : sur les graines 1 à 40, de 0 à 21 refus
+  (médiane 9). Voir `REFERENCE.md` §1.3.
+- Le sac de mots dit aussi DENY sur la ligne 4, mais il n'a pas appris la
+  règle 5 (0/8 sur les cas même-département) : il refuse tout contractor en
+  lecture interne. Ce n'est pas de la généralisation.
+
+Le modèle n'est donc pas un détecteur de failles : sa confiance n'est pas
+calibrée sur des cas jamais vus. Ce qui reste : un désaccord entre le
+modèle et la règle est un indice qui mérite une relecture humaine.
 
 Une divergence n'est ni un bug ni une preuve que le modèle « comprend
 mieux » l'intention de la politique : c'est le signe attendu qu'un

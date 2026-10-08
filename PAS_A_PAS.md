@@ -202,14 +202,20 @@ pour comparer.
 | `employee read public engineering/engineering` | ALLOW | ALLOW | cas ordinaire : tout le monde est d'accord |
 | `guest delete confidential finance/marketing` | DENY | DENY | cas ordinaire : tout le monde est d'accord |
 | `contractor read internal hr/hr` | ALLOW | ALLOW | il a **appris** la règle 5 vue à l'entraînement |
-| `contractor read internal hr/marketing` | ALLOW | **DENY** | il **généralise** sur un cas jamais vu |
+| `contractor read internal hr/marketing` | ALLOW | **DENY** | il **conteste** un cas jamais vu |
 | `intern read ...` | DENY | DENY | rôle inconnu → token `UNK` |
 
 La 4ᵉ ligne est l'essentiel. Rego applique sa règle 5 sans broncher et dit
 ALLOW. Le modèle, lui, a retenu des autres règles que « même département »
-compte, et refuse. **Il signale la faille que la règle ne sait pas
-signaler.** C'est exactement ce qu'un système purement basé sur des règles
-ne peut pas faire.
+compte, et refuse. Un système purement basé sur des règles ne peut pas
+produire ce désaccord.
+
+Mais il faut le lire avec prudence. Ce n'est qu'**une** requête : sur les
+24 cas-faille, le modèle n'en refuse que **11**, et presque toujours avec
+plus de 95 % de confiance, dans un sens ou dans l'autre. La même requête
+avec un MFA, qu'aucune règle de lecture n'utilise, passe en ALLOW (1,3 %).
+Et selon la graine, le nombre de refus va de 0 à 21. Le modèle ne détecte
+pas la faille : il donne un **indice**, à faire vérifier par un humain.
 
 ---
 
@@ -224,8 +230,10 @@ Ce mode de fonctionnement a plusieurs intérêts pour la classification :
   consomme directement, pas besoin de lire ni d'interpréter une phrase.
 - **Pas de réponse hors sujet** — les classes sont connues d'avance, donc
   pas de valeur inventée (« hallucination »).
-- **La confiance guide la décision** — un cas à 51 % peut être envoyé en
-  revue humaine, alors qu'une règle binaire n'exprime aucun doute.
+- **La confiance peut guider la décision** — un cas à 51 % peut être envoyé
+  en revue humaine, alors qu'une règle binaire n'exprime aucun doute. À
+  condition que cette confiance soit calibrée : ici, sur les cas jamais vus,
+  elle ne l'est pas (le modèle est sûr de lui dans les deux sens).
 - **Il généralise** — entraîné sur beaucoup d'exemples, il peut traiter des
   combinaisons jamais vues, là où une règle doit être écrite - ou corrigée.
 - **Il est léger et rapide** — une fois entraîné, répondre coûte très peu,
@@ -238,8 +246,8 @@ Ce mode de fonctionnement a plusieurs intérêts pour la classification :
 - **Rego** est **exact, lisible et auditable** : c'est le bon outil pour
   *définir* la politique et pour fabriquer les étiquettes.
 - **Le modèle** est **approximatif mais généralisant** : il apprend de
-  Rego, répond vite, donne un doute, et peut détecter des cas limites —
-  à condition qu'un humain reprenne la main sur les cas douteux.
+  Rego, répond vite, et peut contester certains cas limites — un indice
+  instable, qu'un humain doit vérifier.
 
 La démo ne dit pas « le modèle est meilleur que Rego ». Elle montre
 comment un modèle statistique **interpole** ce qu'il a observé, comment on
