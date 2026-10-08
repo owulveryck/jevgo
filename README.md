@@ -23,6 +23,23 @@ weights/     les poids sérialisés (JSON), produit de l'entraînement
 > L'objectif est de comprendre ce que fait *vraiment* un transformer,
 > en le construisant soi-même, ligne par ligne.
 
+## Le POC en une image
+
+![Le modèle n'exécute pas la règle : il interpole à partir d'exemples](docs/one-slide-complex.png)
+
+1. **Rego fournit 1 152 exemples** : toutes les requêtes possibles,
+   étiquetées par la politique ; en rouge, les 24 requêtes de la faille
+   (règle 5), retirées de l'entraînement.
+2. **Le modèle apprend par l'exemple** sur les 1 128 autres, puis on
+   l'interroge sur une case rouge qu'il n'a jamais vue.
+3. **Sur les cas cachés**, il contredit Rego sur 11 des 24, de façon
+   instable. Le bilan dit ce que le POC valide et ce qu'il ne valide pas
+   (détail dans « Ce que la mesure dit vraiment », plus bas).
+
+Source de la slide : [`slides/one-slide-complex.md`](slides/one-slide-complex.md)
+(Starlark, compilée avec `mdslides -format lecture`). Les autres decks sont
+dans [`slides/`](slides/).
+
 Documentation, au format [Diátaxis](https://diataxis.fr/) :
 
 - [`PAS_A_PAS.md`](PAS_A_PAS.md) — **explication pas à pas** : comment le
