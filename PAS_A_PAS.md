@@ -214,8 +214,11 @@ Mais il faut le lire avec prudence. Ce n'est qu'**une** requête : sur les
 24 cas-faille, le modèle n'en refuse que **11**, et presque toujours avec
 plus de 95 % de confiance, dans un sens ou dans l'autre. La même requête
 avec un MFA, qu'aucune règle de lecture n'utilise, passe en ALLOW (1,3 %).
-Et selon la graine, le nombre de refus va de 0 à 21. Le modèle ne détecte
-pas la faille : il donne un **indice**, à faire vérifier par un humain.
+Et selon la graine, le nombre de refus va de 0 à 21. Surtout, cacher la
+règle 2 (pourtant correcte) le fait contester 24 cas sur 24 : il repère une
+**incohérence** entre les règles 2 et 5, qui se contredisent, mais ne sait
+pas laquelle est la faille. C'est à un humain de trancher (voir
+`README.md`, « Ce que la mesure dit vraiment »).
 
 ---
 

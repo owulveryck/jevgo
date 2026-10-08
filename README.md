@@ -195,9 +195,24 @@ Ce que la mesure dit vraiment (seed 1337, poids de `go run ./training`) :
   règle 5 (0/8 sur les cas même-département) : il refuse tout contractor en
   lecture interne. Ce n'est pas de la généralisation.
 
-Le modèle n'est donc pas un détecteur de failles : sa confiance n'est pas
-calibrée sur des cas jamais vus. Ce qui reste : un désaccord entre le
-modèle et la règle est un indice qui mérite une relecture humaine.
+Le désaccord est-il propre à la faille ? Deux contrôles (seed 1337) :
+
+- **24 requêtes ordinaires tirées au hasard**, cachées en même temps que la
+  faille (20 tirages) : 0,2 désaccord sur 24 en moyenne, contre 13,3 sur la
+  faille. Le modèle complète correctement les trous dispersés.
+- **Chacun des 24 blocs de la même forme que la faille** (rôle, action,
+  classification, autre département), caché seul : 22 blocs complétés sans
+  erreur (au plus 1 désaccord). Deux blocs seulement sont contestés :
+  la faille (`contractor read internal`, 11/24) et la règle 2
+  (`employee read internal`, **24/24**), pourtant correcte.
+
+Les règles 2 et 5 sont voisines (lecture, interne, autre département) et se
+contredisent (employee : DENY, contractor : ALLOW). Cachez l'une, le modèle
+la prédit d'après l'autre. Il repère donc une **incohérence entre deux
+règles voisines**, mais pas **laquelle est la faille** : c'est symétrique,
+et la fausse alerte (24/24) est plus forte que la vraie (11/24). Sa
+confiance n'est pas calibrée non plus. Ce qui reste : une incohérence
+repérée est à trancher par un humain.
 
 Une divergence n'est ni un bug ni une preuve que le modèle « comprend
 mieux » l'intention de la politique : c'est le signe attendu qu'un
